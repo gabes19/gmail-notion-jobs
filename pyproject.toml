@@ -1,0 +1,31 @@
+[project]
+name = "gmail-notion-jobs"
+version = "0.1.0"
+description = "Review-first Gmail to Notion job application tracker automation."
+requires-python = ">=3.10"
+dependencies = [
+  "google-api-python-client>=2.130.0",
+  "google-auth>=2.29.0",
+  "google-auth-httplib2>=0.2.0",
+  "google-auth-oauthlib>=1.2.0",
+  "requests>=2.32.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.2.0",
+]
+
+[project.scripts]
+gmail-notion-jobs = "job_tracker_automation.cli:main"
+
+[build-system]
+requires = ["setuptools>=69.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
