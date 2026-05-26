@@ -39,14 +39,23 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
           SCAN_DAYS: ${{ github.event.inputs.days }}
           SCAN_MAX_RESULTS: ${{ github.event.inputs.max_results }}
-        run: >
-          gmail-notion-jobs scan
-          --days "${SCAN_DAYS:-14}"
-          --max-results "${SCAN_MAX_RESULTS:-100}"
-          --write-issue
-          --json-output proposals.json
-          --markdown-output review.md
+          PUBLISH_REVIEW_ISSUE: ${{ vars.PUBLISH_REVIEW_ISSUE }}
+        shell: bash
+        run: |
+          issue_flag=""
+          if [ "$PUBLISH_REVIEW_ISSUE" = "true" ]; then
+            issue_flag="--write-issue"
+          fi
+
+          gmail-notion-jobs scan \
+            --days "${SCAN_DAYS:-14}" \
+            --max-results "${SCAN_MAX_RESULTS:-100}" \
+            --json-output proposals.json \
+            --markdown-output review.md \
+            --quiet \
+            $issue_flag
       - uses: actions/upload-artifact@v4
+        if: ${{ vars.PUBLISH_REVIEW_ARTIFACT == 'true' }}
         with:
           name: gmail-notion-review
           path: |

@@ -9,6 +9,7 @@ dist/
 build/
 *.egg-info/
 credentials.json
+client_secret_*.json
 token.json
 proposals.json
 review.md

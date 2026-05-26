@@ -25,6 +25,7 @@ def main(argv: list[str] | None = None) -> int:
     scan.add_argument("--write-issue", action="store_true", help="Create/update the GitHub review issue.")
     scan.add_argument("--json-output", type=Path, help="Write proposals JSON to this path.")
     scan.add_argument("--markdown-output", type=Path, help="Write review Markdown to this path.")
+    scan.add_argument("--quiet", action="store_true", help="Do not print proposal details to stdout.")
 
     apply = subparsers.add_parser("apply", help="Apply selected proposal IDs to Notion.")
     _add_scan_args(apply)
@@ -60,7 +61,10 @@ def _scan(args: argparse.Namespace, settings: Settings) -> int:
     if args.json_output:
         args.json_output.write_text(json_payload, encoding="utf-8")
 
-    print(markdown)
+    if args.quiet:
+        print(f"Generated {len(proposals)} proposal(s).")
+    else:
+        print(markdown)
     if args.write_issue:
         settings.require_github()
         issue_url = GitHubIssueClient(
