@@ -39,14 +39,14 @@ If Google shows `Error 403: access_denied` and says the app has not completed ve
 
 For a personal automation, Google verification is not required while you are in Testing mode and your account is listed as a test user.
 
-5. Add these GitHub repository secrets:
+5. Add these GitHub environment secrets under **Settings -> Environments -> env -> Environment secrets**:
 
 - `GOOGLE_OAUTH_CLIENT_JSON`
 - `GOOGLE_OAUTH_TOKEN_JSON`
 - `NOTION_TOKEN`
 - `NOTION_DATA_SOURCE_ID`
 
-Optional repository variable:
+Optional repository or environment variable:
 
 - `NOTION_VERSION`, default `2025-09-03`
 
@@ -84,7 +84,7 @@ git commit -m "Add Gmail Notion job tracker automation"
 gh repo create gmail-notion-jobs --private --source . --remote origin --push
 ```
 
-Then confirm the repository has Actions enabled and add the secrets above under **Settings -> Secrets and variables -> Actions**.
+Then confirm the repository has Actions enabled and add the secrets above under **Settings -> Environments -> env -> Environment secrets**.
 
 ## Workflows
 
