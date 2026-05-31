@@ -1,10 +1,16 @@
 from __future__ import annotations
 
+import re
 from typing import Any
+from urllib.parse import urlparse
 
 import requests
 
 from .models import NotionRow
+
+
+class NotionConfigurationError(RuntimeError):
+    pass
 
 
 class NotionClient:
@@ -15,8 +21,10 @@ class NotionClient:
         notion_version: str = "2025-09-03",
     ) -> None:
         self.token = token
-        self.data_source_id = data_source_id.replace("collection://", "")
+        self.original_data_source_id = data_source_id.strip()
+        self.data_source_id = _normalize_notion_id(data_source_id)
         self.notion_version = notion_version
+        self._tried_database_resolution = False
         self.session = requests.Session()
         self.session.headers.update(
             {
@@ -33,11 +41,7 @@ class NotionClient:
             payload: dict[str, Any] = {"page_size": 100}
             if cursor:
                 payload["start_cursor"] = cursor
-            response = self.session.post(
-                f"https://api.notion.com/v1/data_sources/{self.data_source_id}/query",
-                json=payload,
-                timeout=30,
-            )
+            response = self._query_data_source(payload)
             response.raise_for_status()
             data = response.json()
             rows.extend(_page_to_row(page) for page in data.get("results", []))
@@ -54,6 +58,7 @@ class NotionClient:
         response.raise_for_status()
 
     def create_page(self, properties: dict[str, str]) -> str:
+        self._resolve_database_id_if_present()
         response = self.session.post(
             "https://api.notion.com/v1/pages",
             json={
@@ -64,6 +69,53 @@ class NotionClient:
         )
         response.raise_for_status()
         return response.json()["id"]
+
+    def _query_data_source(self, payload: dict[str, Any]) -> requests.Response:
+        response = self.session.post(
+            f"https://api.notion.com/v1/data_sources/{self.data_source_id}/query",
+            json=payload,
+            timeout=30,
+        )
+        if response.status_code != 404:
+            return response
+
+        self._resolve_database_id_if_present()
+        response = self.session.post(
+            f"https://api.notion.com/v1/data_sources/{self.data_source_id}/query",
+            json=payload,
+            timeout=30,
+        )
+        if response.status_code == 404:
+            raise NotionConfigurationError(
+                "Notion could not find the configured data source. Set "
+                "NOTION_DATA_SOURCE_ID to the Applications data source ID, or to a "
+                "database ID whose first data source is shared with your Notion "
+                "integration. Also confirm the database is shared with the same "
+                "integration token used by NOTION_TOKEN."
+            )
+        return response
+
+    def _resolve_database_id_if_present(self) -> None:
+        if self._tried_database_resolution:
+            return
+        self._tried_database_resolution = True
+
+        response = self.session.get(
+            f"https://api.notion.com/v1/databases/{self.data_source_id}",
+            timeout=30,
+        )
+        if response.status_code == 404:
+            return
+        response.raise_for_status()
+
+        data_sources = response.json().get("data_sources", [])
+        if not data_sources:
+            raise NotionConfigurationError(
+                "Notion found the configured database, but it did not return any "
+                "data sources. Copy the Applications data source ID from Notion's "
+                "Manage data sources menu and use it for NOTION_DATA_SOURCE_ID."
+            )
+        self.data_source_id = _normalize_notion_id(data_sources[0]["id"])
 
 
 def _page_to_row(page: dict[str, Any]) -> NotionRow:
@@ -98,6 +150,28 @@ def _read_prop(prop: dict[str, Any] | None) -> str:
     if prop_type == "date":
         return (prop.get("date") or {}).get("start", "")
     return str(prop.get(prop_type, "") or "")
+
+
+def _normalize_notion_id(value: str) -> str:
+    notion_id = value.strip().replace("collection://", "")
+    parsed = urlparse(notion_id)
+    if parsed.scheme and parsed.netloc:
+        path_parts = [part for part in parsed.path.split("/") if part]
+        if path_parts:
+            notion_id = path_parts[-1]
+
+    notion_id = notion_id.split("?", 1)[0].split("#", 1)[0]
+    match = re.search(
+        r"([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})",
+        notion_id,
+    )
+    if match:
+        return match.group(1)
+
+    match = re.search(r"([0-9a-fA-F]{32})", notion_id)
+    if match:
+        return match.group(1)
+    return notion_id
 
 
 def _notion_properties(properties: dict[str, str]) -> dict[str, Any]:

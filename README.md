@@ -64,7 +64,7 @@ Create a Notion connection for the workspace that owns your job board:
 5. Give the connection access to your job board using either Notion-supported path:
    - Preferred from the developer portal: open the connection's **Content access** tab and add the `Job Search` page or the `Applications` database.
    - From Notion: open the `Job Search` page, click the `...` menu, choose `Add connections`, search for your connection, and confirm access to the page and child pages.
-6. Set `NOTION_DATA_SOURCE_ID` to the data source ID for the `Applications` database. Keep this only in GitHub Secrets, not in source code.
+6. Set `NOTION_DATA_SOURCE_ID` to the data source ID for the `Applications` database. A database ID from the Notion URL also works if the integration can retrieve that database and it has a data source. Keep this only in GitHub Secrets, not in source code.
 
 If the connection does not appear in `Add connections`, confirm:
 

@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from job_tracker_automation.notion_client import _notion_properties, _read_prop
+from typing import Any
+
+import requests
+
+from job_tracker_automation.notion_client import NotionClient, _normalize_notion_id, _notion_properties, _read_prop
 
 
 def test_notion_properties_use_title_for_company_and_rich_text_for_text_fields() -> None:
@@ -16,3 +20,58 @@ def test_read_notion_rich_text_property() -> None:
         _read_prop({"type": "rich_text", "rich_text": [{"plain_text": "Applied"}]})
         == "Applied"
     )
+
+
+def test_normalizes_full_notion_url_to_id() -> None:
+    assert (
+        _normalize_notion_id(
+            "https://www.notion.so/workspace/Applications-248104cd477e80afbc30000bd28de8f9?v=123"
+        )
+        == "248104cd477e80afbc30000bd28de8f9"
+    )
+
+
+def test_list_rows_resolves_database_id_to_first_data_source() -> None:
+    client = NotionClient("token", "database-id")
+    session = FakeSession(
+        [
+            FakeResponse(404, {}),
+            FakeResponse(200, {"data_sources": [{"id": "data-source-id"}]}),
+            FakeResponse(200, {"results": [], "has_more": False}),
+        ]
+    )
+    client.session = session
+
+    assert client.list_rows() == []
+    assert session.requests == [
+        ("POST", "https://api.notion.com/v1/data_sources/database-id/query"),
+        ("GET", "https://api.notion.com/v1/databases/database-id"),
+        ("POST", "https://api.notion.com/v1/data_sources/data-source-id/query"),
+    ]
+
+
+class FakeResponse:
+    def __init__(self, status_code: int, payload: dict[str, Any]) -> None:
+        self.status_code = status_code
+        self.payload = payload
+
+    def json(self) -> dict[str, Any]:
+        return self.payload
+
+    def raise_for_status(self) -> None:
+        if self.status_code >= 400:
+            raise requests.HTTPError(f"{self.status_code} error")
+
+
+class FakeSession:
+    def __init__(self, responses: list[FakeResponse]) -> None:
+        self.responses = responses
+        self.requests: list[tuple[str, str]] = []
+
+    def post(self, url: str, **_: Any) -> FakeResponse:
+        self.requests.append(("POST", url))
+        return self.responses.pop(0)
+
+    def get(self, url: str, **_: Any) -> FakeResponse:
+        self.requests.append(("GET", url))
+        return self.responses.pop(0)
